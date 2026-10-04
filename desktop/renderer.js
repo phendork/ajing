@@ -34,16 +34,13 @@ const settingsStatusEl = document.getElementById("settingsStatus");
 const resetAllFxBtn = document.getElementById("resetAllFxBtn");
 
 const settingsFields = {
+  PLAYLIST_URL: document.getElementById("cfgPlaylistUrl"),
   GOOGLE_PLAYLIST_ID: document.getElementById("cfgGooglePlaylistId"),
   GOOGLE_CLIENT_ID: document.getElementById("cfgGoogleClientId"),
   GOOGLE_CLIENT_SECRET: document.getElementById("cfgGoogleClientSecret"),
   GOOGLE_REFRESH_TOKEN: document.getElementById("cfgGoogleRefreshToken"),
-  BPM_SAMPLE_SECONDS: document.getElementById("cfgBpmSampleSeconds"),
-  TEMPO_MATCH_POOL_SIZE: document.getElementById("cfgTempoMatchPoolSize"),
-  MAX_TEMPO_SHIFT_PERCENT: document.getElementById("cfgMaxTempoShiftPercent"),
-
-  MIN_TRANSITION_SECONDS: document.getElementById("cfgMinTransitionSeconds"),
-  MAX_TRANSITION_SECONDS: document.getElementById("cfgMaxTransitionSeconds"),
+  BLEND_MAX_TEMPO_SHIFT_PERCENT: document.getElementById("cfgBlendMaxTempoShiftPercent"),
+  TEMPO_RAMP_BEATS: document.getElementById("cfgTempoRampBeats"),
   PLAY_AUDIO: document.getElementById("cfgPlayAudio"),
   CLEAN_TEMP_AFTER_RUN: document.getElementById("cfgCleanTempAfterRun"),
   AUTO_RESET_ON_START: document.getElementById("cfgAutoResetOnStart"),
@@ -343,31 +340,43 @@ function applySettingsToForm(settings) {
     input.value = value === undefined || value === null ? "" : String(value);
   }
 
+  updatePlaylistIdHint();
   settingsDirty = false;
+}
+
+function extractPlaylistIdFromUrl(url) {
+  try {
+    return new URL(String(url || "").trim()).searchParams.get("list") || "";
+  } catch {
+    return "";
+  }
+}
+
+// When the ID field is empty, show the ID that will be taken from the URL.
+function updatePlaylistIdHint() {
+  const idFromUrl = extractPlaylistIdFromUrl(settingsFields.PLAYLIST_URL.value);
+  settingsFields.GOOGLE_PLAYLIST_ID.placeholder = idFromUrl ? `${idFromUrl} (from URL)` : "PLxxxxxxxxxxxxxxxx";
 }
 
 function collectSettingsFromForm() {
   const payload = {
+    PLAYLIST_URL: String(settingsFields.PLAYLIST_URL.value || "").trim(),
     GOOGLE_PLAYLIST_ID: String(settingsFields.GOOGLE_PLAYLIST_ID.value || "").trim(),
     GOOGLE_CLIENT_ID: String(settingsFields.GOOGLE_CLIENT_ID.value || "").trim(),
     GOOGLE_CLIENT_SECRET: String(settingsFields.GOOGLE_CLIENT_SECRET.value || "").trim(),
     GOOGLE_REFRESH_TOKEN: String(settingsFields.GOOGLE_REFRESH_TOKEN.value || "").trim(),
-    BPM_SAMPLE_SECONDS: Math.round(coerceNumberFromInput(settingsFields.BPM_SAMPLE_SECONDS.value, 300)),
-    TEMPO_MATCH_POOL_SIZE: Math.round(coerceNumberFromInput(settingsFields.TEMPO_MATCH_POOL_SIZE.value, 1)),
-    MAX_TEMPO_SHIFT_PERCENT: Number(coerceNumberFromInput(settingsFields.MAX_TEMPO_SHIFT_PERCENT.value, 12).toFixed(3)),
-
-    MIN_TRANSITION_SECONDS: Number(coerceNumberFromInput(settingsFields.MIN_TRANSITION_SECONDS.value, 40).toFixed(3)),
-    MAX_TRANSITION_SECONDS: Number(coerceNumberFromInput(settingsFields.MAX_TRANSITION_SECONDS.value, 88).toFixed(3)),
+    BLEND_MAX_TEMPO_SHIFT_PERCENT: Number(coerceNumberFromInput(settingsFields.BLEND_MAX_TEMPO_SHIFT_PERCENT.value, 6).toFixed(3)),
+    TEMPO_RAMP_BEATS: Math.round(coerceNumberFromInput(settingsFields.TEMPO_RAMP_BEATS.value, 32)),
     PLAY_AUDIO: Boolean(settingsFields.PLAY_AUDIO.checked),
     CLEAN_TEMP_AFTER_RUN: Boolean(settingsFields.CLEAN_TEMP_AFTER_RUN.checked),
     AUTO_RESET_ON_START: Boolean(settingsFields.AUTO_RESET_ON_START.checked),
   };
 
-  payload.MAX_TRANSITION_SECONDS = Math.max(payload.MIN_TRANSITION_SECONDS, payload.MAX_TRANSITION_SECONDS);
   return payload;
 }
 
 function handleSettingsFieldChange() {
+  updatePlaylistIdHint();
   settingsDirty = true;
   setSettingsStatus("Unsaved changes. Save to apply settings for the next mix preparation.", "warn");
   refreshButtons();

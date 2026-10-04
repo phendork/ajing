@@ -12,7 +12,8 @@
     "node_modules/**/*",
     "package.json",
     ".env.example",
-    "README.md"
+    "README.md",
+    "!scripts/dev/**/*"
   ],
   "extraMetadata": {
     "main": "desktop/main.js"
@@ -27,5 +28,22 @@
         ]
       }
     ]
+  },
+  "mac": {
+    "category": "public.app-category.music",
+    "target": [
+      {
+        "target": "dmg",
+        "arch": [
+          "arm64"
+        ]
+      }
+    ],
+    "identity": "-",
+    "hardenedRuntime": false,
+    "gatekeeperAssess": false
+  },
+  "dmg": {
+    "artifactName": "AJING-AI-DJ-${version}-${arch}.${ext}"
   }
 }

@@ -11,6 +11,14 @@ const DJ_SCRIPT = path.join(ROOT_DIR, "src", "ai-dj.js");
 
 app.commandLine.appendSwitch("autoplay-policy", "no-user-gesture-required");
 
+// Apps opened from Finder/Dock get a minimal PATH without Homebrew, so
+// ffmpeg / ffprobe / ffplay / yt-dlp would not be found.
+if (process.platform === "darwin") {
+  const extraPaths = ["/opt/homebrew/bin", "/usr/local/bin"];
+  const current = String(process.env.PATH || "").split(":").filter(Boolean);
+  process.env.PATH = [...extraPaths.filter((p) => !current.includes(p)), ...current].join(":");
+}
+
 let mainWindow = null;
 let activeDjProcess = null;
 let ffplayProcess = null;
@@ -35,15 +43,13 @@ let playbackState = {
 
 const DESKTOP_SETTINGS_VERSION = 1;
 const DESKTOP_SETTING_DEFINITIONS = [
+  { key: "PLAYLIST_URL", type: "string", defaultValue: "" },
   { key: "GOOGLE_PLAYLIST_ID", type: "string", defaultValue: "" },
   { key: "GOOGLE_CLIENT_ID", type: "string", defaultValue: "" },
   { key: "GOOGLE_CLIENT_SECRET", type: "string", defaultValue: "" },
   { key: "GOOGLE_REFRESH_TOKEN", type: "string", defaultValue: "" },
-  { key: "BPM_SAMPLE_SECONDS", type: "int", defaultValue: 300, min: 10, max: 300 },
-  { key: "TEMPO_MATCH_POOL_SIZE", type: "int", defaultValue: 1, min: 1, max: 30 },
-  { key: "MAX_TEMPO_SHIFT_PERCENT", type: "number", defaultValue: 12, min: 0, max: 100 },
-  { key: "MIN_TRANSITION_SECONDS", type: "number", defaultValue: 40, min: 1, max: 180 },
-  { key: "MAX_TRANSITION_SECONDS", type: "number", defaultValue: 88, min: 1, max: 180 },
+  { key: "BLEND_MAX_TEMPO_SHIFT_PERCENT", type: "number", defaultValue: 6, min: 0, max: 12 },
+  { key: "TEMPO_RAMP_BEATS", type: "int", defaultValue: 32, min: 4, max: 128 },
   { key: "PLAY_AUDIO", type: "bool", defaultValue: true },
   { key: "CLEAN_TEMP_AFTER_RUN", type: "bool", defaultValue: false },
   { key: "AUTO_RESET_ON_START", type: "bool", defaultValue: false },
@@ -131,7 +137,6 @@ function normalizeDesktopSettingsFromInput(inputValues = {}, fallbackValues = {}
     settings[definition.key] = normalizeSettingValue(definition, rawValue, fallbackValue);
   }
 
-  settings.MAX_TRANSITION_SECONDS = Math.max(settings.MIN_TRANSITION_SECONDS, settings.MAX_TRANSITION_SECONDS);
   return settings;
 }
 
@@ -726,6 +731,9 @@ function resolveEnvCandidatePaths() {
     path.join(exeDir, ".env"),
     path.resolve(exeDir, "..", ".env"),
     path.resolve(exeDir, "..", "..", ".env"),
+    // macOS: exeDir is <App>.app/Contents/MacOS — look next to the .app too.
+    process.platform === "darwin" ? path.resolve(exeDir, "..", "..", "..", ".env") : null,
+    app.isPackaged ? path.join(app.getPath("userData"), ".env") : null,
     path.join(process.cwd(), ".env"),
   ];
 

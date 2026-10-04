@@ -26,10 +26,11 @@
 Node.js AI DJ engine for YouTube/YouTube Music playlists with:
 
 - Private playlist support (OAuth refresh token or yt-dlp cookies)
-- Random unplayed selection with BPM-aware ordering
-- **Beat-accurate tempo matching** — every track is stretched to the same BPM using `atempo`, then re-analysed to get the exact beat grid of the rendered stem
-- **Professional EQ-swap transitions** — bass band swaps first (0–60%), high band swaps second (40–100%), 20% overlap. No volume fades — constant perceived loudness at all times. Equal-power `esin`/`isin` curves. True 4th-order Linkwitz-Riley crossover at 250 Hz
-- **Sub-beat alignment** — 401 candidate offsets tested per transition, weighted toward early transition beats
+- **Native tempo, no extreme speeds** — every song plays at its own BPM. During a blend both decks meet halfway (124 ↔ 128 → both at 126) and glide back over 8 bars, so no song is ever pushed far from its real speed
+- **Sample-exact beatmatching** — beat grids are fitted to ±0.01 BPM and locked to the kick attack; tracks are rendered with a band-limited varispeed resampler (no time-stretch transient smearing), and drifting/live tempos are flattened beat by beat inside blends
+- **Smooth random order** — tracks are ordered on the tempo circle (87 ↔ 174, 70 ↔ 140 count as neighbours) and shuffled locally, so every run differs but neighbours are close in tempo
+- **Phrase-aware DJ transitions** — blends start on 16-beat phrase boundaries: Bass Swap Blend, Filter Handoff, Quick Drop Swap, Echo Out Drop, Loop Roll Drop, Reverb Wash, Smooth Crossfade (for beatless tracks)
+- **Loudness matched** — each song is normalised to the same LUFS; the mix bus ends in a true-peak limiter
 - Detailed progress output with spinner-friendly logs
 - Persistent played/unplayed/unavailable state
 - Automatic skip of unavailable videos
@@ -183,15 +184,41 @@ If desktop build shows missing `PLAYLIST_URL`/`GOOGLE_PLAYLIST_ID`, place `.env`
 | `STATE_FILE` | `.cache/dj-state.json` | Persistent played/unplayed/unavailable state. |
 | `OUTPUT_FILE` | `.cache/output/ai-dj-mix.wav` | Rendered mix output audio file. |
 | `DJ_SESSION_FILE` | `.cache/output/ai-dj-session.json` | Session timeline metadata for desktop controls. |
-| `BPM_SAMPLE_SECONDS` | `90` | Seconds sampled for BPM estimation (more = higher accuracy). |
-| `TEMPO_MATCH_POOL_SIZE` | `5` | Candidate pool for next-track selection by BPM closeness. |
-| `MIN_TRANSITION_SECONDS` | `16` | Minimum transition duration. |
-| `MAX_TRANSITION_SECONDS` | `32` | Maximum transition duration. |
+| `BLEND_MAX_TEMPO_SHIFT_PERCENT` | `6` | Max speed change of a deck during a blend. Pairs further apart than 2× this get a phrase-locked cut style. |
+| `TEMPO_RAMP_BEATS` | `32` | Beats a song takes to glide between native and blend tempo. |
+| `SET_SHAPE` | `auto` | Running order: `rise` (slow → fast), `arc` (build, peak, come down), `auto`. |
+| `TRANSITION_STYLES` | _(all)_ | Comma list: `bass_swap,filter_handoff,quick_swap,echo_out,loop_roll,reverb_wash,smooth_fade`. |
+| `TARGET_LUFS` | `-14` | Loudness every song is matched to. |
+| `SET_SEED` | _(random)_ | Fix the order/transition choices to reproduce a set. |
 | `PLAY_AUDIO` | `true` | If false, render only (no immediate ffplay playback). |
 | `MARK_PLAYED_WHEN_NOT_PLAYING` | `true` | If `PLAY_AUDIO=false`, mark planned tracks as played after render. |
 | `CLEAN_TEMP_AFTER_RUN` | `false` | Cleanup intermediate render files after run. |
 | `DISABLE_SPINNERS` | `false` | Disable animated spinner output. |
 | `AUTO_RESET_ON_START` | `false` | Reset played flags at startup. |
+
+## How the mix is built
+
+1. **Analysis** (cached per track): onset envelopes → coarse tempo → harmonic phase-coherence fit over the whole song (period precise to a few hundredths of a BPM) → beat phase locked to the kick attack → per-beat drift map for live recordings → 16-beat phrase grid, intro/outro and kick presence.
+2. **Planning**: order on the tempo circle; for each pair pick a style, the outgoing phrase where it mixes out and the incoming phrase where it enters, and the shared blend tempo (geometric mean, so each deck moves half the gap).
+3. **Rendering**: each track gets a per-beat tempo map (native body, 8-bar glides, locked pulse during blends), is resampled sample-exactly, run through a DJ channel strip (3-band kill EQ, resonant HPF/LPF, beat-synced echo, reverb, loop roll) and summed onto the mix bus at a sample-exact offset.
+
+The log shows each transition and the measured beat-lock drift between the two decks inside every blend.
+
+### Verifying precision locally
+
+Generate synthetic tracks with known beat positions and render a test set:
+
+```bash
+npm run test:tracks
+```
+
+```bash
+npm run test:mix
+```
+
+`test:mix` prints the true kick alignment error of every blend (typically below 1 ms).
+
+Note: tempo changes are varispeed (like a turntable / CDJ without key lock), so pitch follows tempo during blends — at most half the tempo gap, usually 1–3%.
 
 ## Troubleshooting
 

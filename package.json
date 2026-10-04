@@ -1,7 +1,7 @@
 {
   "name": "ai-dj-youtube-music",
   "version": "1.0.0",
-  "description": "AI DJ for private YouTube Music playlists with tempo-aware random transitions",
+  "description": "AI DJ for private YouTube Music playlists with beat-locked, phrase-aware DJ transitions",
   "main": "src/ai-dj.js",
   "type": "commonjs",
   "scripts": {
@@ -10,7 +10,10 @@
     "reset": "node src/ai-dj.js --reset",
     "oauth:youtube": "node scripts/setup-google-oauth.js",
     "desktop:dev": "electron desktop/main.js",
-    "desktop:build": "node scripts/desktop-build.js"
+    "desktop:build": "node scripts/desktop-build.js",
+    "desktop:build:mac": "node scripts/desktop-build.js --mac",
+    "test:tracks": "node scripts/dev/make-test-tracks.js .cache/test-tracks",
+    "test:mix": "node scripts/dev/test-mix.js .cache/test-tracks"
   },
   "keywords": [
     "youtube-music",
@@ -24,11 +27,13 @@
   "dependencies": {
     "dotenv": "^16.4.5",
     "googleapis": "^171.4.0",
-    "music-tempo": "^1.0.3",
     "ora": "^5.4.1"
   },
   "devDependencies": {
-    "electron": "^31.7.7",
-    "electron-builder": "^24.13.3"
+    "electron": "^44.5.1",
+    "electron-builder": "^26.15.3"
+  },
+  "allowScripts": {
+    "electron@31.7.7": true
   }
 }
